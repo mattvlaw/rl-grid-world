@@ -54,7 +54,7 @@ class Environment(object):
 			y, x = position		
 			(w, h), _ = cv2.getTextSize(text, font, 1, 2)
 				
-			cv2.putText(self.frame, text, (int((x+0.5)*self.scale)-w/2, int((y+0.5)*self.scale+h/2)), font, 1, color, 2, cv2.LINE_AA)
+			cv2.putText(self.frame, text, (int((x+0.5)*self.scale-w/2), int((y+0.5)*self.scale+h/2)), font, 1, color, 2, cv2.LINE_AA)
 
 	def init_start_state(self):
 		
@@ -93,6 +93,15 @@ class Environment(object):
 		
 		return range(self.action_space) 
 	
+	def get_bestaction(self, qvalues):
+		best_action = 0
+		best_qvalue = qvalues[0]
+		for action, qvalue in enumerate(qvalues):
+				if qvalue > best_qvalue:
+						best_qvalue = qvalue
+						best_action = action
+		return best_action
+	
 	def step(self, action):
 		
 		if action >= self.action_space:
@@ -113,8 +122,9 @@ class Environment(object):
 		y_within = proposed[0] >= 0 and proposed[0] < self.gridH
 		x_within = proposed[1] >= 0 and proposed[1] < self.gridW
 		free = proposed not in self.blocked_positions		
-		
-		if x_within and y_within and free:
+		not_term = self.position not in self.end_positions
+
+		if x_within and y_within and free and not_term:
 			
 			self.position = proposed
 			
@@ -123,6 +133,8 @@ class Environment(object):
 		
 		if self.position in self.end_positions:
 			done = True
+			if self.position == next_state:
+				reward = 0
 		else:
 			done = False
 			
@@ -135,35 +147,38 @@ class Environment(object):
 		else:
 			self.position = self.start_position
 	
-	def render(self, qvalues_matrix):
+	def render(self, qvalues_matrix, policy=None):
 		
 		frame = self.frame.copy()
 		
 		# for each state cell
 		
+		# print (np.min(qvalues_matrix), '->', np.max(qvalues_matrix))
+
 		for idx, qvalues in enumerate(qvalues_matrix):
 			
 			position = self.idx2state[idx]
 		
 			if position in self.end_positions or position in self.blocked_positions:
 				continue
-			
-			qvalues = np.tanh(qvalues*0.1) # for vizualization only
-        	
+			        	
         	# for each action in state cell	
         		
 			for action, qvalue in enumerate(qvalues):
+				
+				tanh_qvalue = np.tanh(qvalue*0.1) # for vizualization only
+
 
 				# draw (state, action) qvalue traingle
 				
 				if action == 0:
-					dx2, dy2, dx3, dy3 = 0.0, 1.0, 1.0, 1.0				
+					dx2, dy2, dx3, dy3, dqx, dqy = 0.0, 1.0, 1.0, 1.0, .5, .85				
 				if action == 1:
-					dx2, dy2, dx3, dy3 = 0.0, 0.0, 1.0, 0.0				
+					dx2, dy2, dx3, dy3, dqx, dqy = 0.0, 0.0, 1.0, 0.0, .5, .15				
 				if action == 2:
-					dx2, dy2, dx3, dy3 = 1.0, 0.0, 1.0, 1.0				
+					dx2, dy2, dx3, dy3, dqx, dqy = 1.0, 0.0, 1.0, 1.0, .85, .5				
 				if action == 3:
-					dx2, dy2, dx3, dy3 = 0.0, 0.0, 0.0, 1.0	
+					dx2, dy2, dx3, dy3, dqx, dqy = 0.0, 0.0, 0.0, 1.0, .15, .5	
 					
 				x1 = int(self.scale*(position[1] + 0.5))			
 				y1 = int(self.scale*(position[0] + 0.5))				
@@ -177,11 +192,20 @@ class Environment(object):
 				pts = np.array([[x1, y1], [x2, y2], [x3, y3]], np.int32)
 				pts = pts.reshape((-1, 1, 2))
 				
-				if qvalue > 0: color = (0, int(qvalue*255),0)
-				elif qvalue < 0: color = (0,0, -int(qvalue*255))
+				if tanh_qvalue > 0: color = (0, int(tanh_qvalue*255),0)
+				elif tanh_qvalue < 0: color = (0,0, -int(tanh_qvalue*255))
 				else: color = (0, 0, 0)
 
 				cv2.fillPoly(frame, [pts], color)
+
+				qtext = "{:5.2f}".format(qvalue)
+				if qvalue > 0.0: qtext = '+' + qtext
+				font = cv2.FONT_HERSHEY_SIMPLEX
+				y, x = position		
+				(w, h), _ = cv2.getTextSize(qtext, font, .4, 1)
+				
+				cv2.putText(frame, qtext, (int((x+dqx)*self.scale-w/2), int((y+dqy)*self.scale+h/2)), font, .4, (255,255,255), 1, cv2.LINE_AA)
+
 			
 			# draw crossed lines
 			
@@ -200,26 +224,24 @@ class Environment(object):
 			cv2.line(frame, (x1, y1), (x2, y2), (255, 255, 255), 2)
 			cv2.line(frame, (x3, y3), (x4, y4), (255, 255, 255), 2)
 			
-			# draw arrow indicating best action
-						
-			best_action = 0
-			best_qvalue = qvalues[0]
-			for action, qvalue in enumerate(qvalues):
-				if qvalue > best_qvalue:
-					best_qvalue = qvalue
-					best_action = action
+			# draw arrows indicating policy or best action
+
+			if policy != None:
+				draw_action = policy(idx, self.get_possible_actions())
+			else: 			
+				draw_action = self.get_bestaction(qvalues)
 			
-			if best_action == 0:
-				dx1, dy1, dx2, dy2 = 0.0, -0.25, 0.0, 0.25	
+			if draw_action == 0:
+				dx1, dy1, dx2, dy2 = 0.0, -0.1, 0.0, 0.1	
 							
-			elif best_action == 1:
-				dx1, dy1, dx2, dy2 = 0.0, 0.25, 0.0, -0.25
+			elif draw_action == 1:
+				dx1, dy1, dx2, dy2 = 0.0, 0.1, 0.0, -0.1
 								
-			elif best_action == 2:
-				dx1, dy1, dx2, dy2 = -0.25, 0.0, 0.25, 0.0
+			elif draw_action == 2:
+				dx1, dy1, dx2, dy2 = -0.1, 0.0, 0.1, 0.0
 								
-			elif best_action == 3:
-				dx1, dy1, dx2, dy2 = 0.25, 0.0, -0.25, 0.0				
+			elif draw_action == 3:
+				dx1, dy1, dx2, dy2 = 0.1, 0.0, -0.1, 0.0				
 									
 			x1 = int(self.scale*(position[1] + 0.5 + dx1))			
 			y1 = int(self.scale*(position[0] + 0.5 + dy1))	
@@ -227,7 +249,7 @@ class Environment(object):
 			x2 = int(self.scale*(position[1] + 0.5 + dx2))			
 			y2 = int(self.scale*(position[0] + 0.5 + dy2))	
 							
-			cv2.arrowedLine(frame, (x1, y1), (x2, y2), (255, 100, 0), 8, line_type=8, tipLength=0.5)		
+			cv2.arrowedLine(frame, (x1, y1), (x2, y2), (255,155,155), 8, line_type=8, tipLength=0.9)		
 			
 		# draw horizontal lines
 		
@@ -240,7 +262,7 @@ class Environment(object):
 			cv2.line(frame, (i*self.scale, 0), (i*self.scale, self.gridH * self.scale), (255, 255, 255), 2)
 					
 		# draw agent
-		
+
 		y, x = self.position
 		
 		y1 = int((y + 0.3)*self.scale)
@@ -248,9 +270,10 @@ class Environment(object):
 		y2 = int((y + 0.7)*self.scale)
 		x2 = int((x + 0.7)*self.scale)
 
-		cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), -1)
+		cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 3)
 
 		cv2.imshow('frame', frame)
 		cv2.moveWindow('frame', 0, 0)
 		key = cv2.waitKey(1)
 		if key == 27: sys.exit()
+

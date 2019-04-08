@@ -14,6 +14,7 @@ class BaseAgent:
 		self.epsilon = epsilon
 		self.discount = discount
 		self.qvalues = np.zeros((state_space, action_space), np.float32)
+		self.policy = np.random.random_integers(0, action_space-1, state_space)
 		
 	def update(self, state, action, reward, next_state, next_state_possible_actions, done):
 
@@ -28,6 +29,11 @@ class BaseAgent:
 		qval = (1.0 - self.alpha)* qval_old + self.alpha * qval_dash
 		self.qvalues[state][action] = qval
         
+	def get_policy_action(self, state, possible_actions):
+		chosen_action =  self.get_best_action(state, possible_actions)
+		#chosen_action =  self.policy[state]
+		return chosen_action
+
 	def get_best_action(self, state, possible_actions):
 
 		best_action = possible_actions[0]
@@ -58,6 +64,28 @@ class BaseAgent:
 		
 		pass
 
+
+
+# ------------------------------------------------------------------------------------------
+# ---------------------------------- First-Value MC Prediction -----------------------------
+# ------------------------------------------------------------------------------------------
+
+class FVMCPrediction(BaseAgent):
+
+	def get_value(self, state, possible_actions):
+
+		# estimate V(s) as maximum of Q(state,action) over possible actions
+
+		value = self.qvalues[state][possible_actions[0]]
+       
+		for action in possible_actions:
+			q_val = self.qvalues[state][action]
+			if q_val > value:
+				value = q_val
+
+		return value
+
+
 # ------------------------------------------------------------------------------------------
 # ---------------------------------- Q-Learning Agent --------------------------------------
 # ------------------------------------------------------------------------------------------
@@ -76,6 +104,17 @@ class QLearningAgent(BaseAgent):
 				value = q_val
 
 		return value
+
+
+# ------------------------------------------------------------------------------------------
+# ------------------------------ Vanilla SARSA Agent --------------------------------
+# ------------------------------------------------------------------------------------------
+    
+class SimpleSarsaAgent(BaseAgent):
+
+	def get_value(self, state, possible_actions):
+
+		return 0
 
 # ------------------------------------------------------------------------------------------
 # ------------------------------ Expected Value SARSA Agent --------------------------------
