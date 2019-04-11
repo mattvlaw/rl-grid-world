@@ -29,13 +29,34 @@ discount = 0.99
 action_space = env.action_space
 state_space = env.state_space
 
-# agent = agent.QLearningAgent(alpha, epsilon, discount, action_space, state_space)
+agent = agent.QLearningAgent(alpha, epsilon, discount, action_space, state_space)
 # agent = agent.EVSarsaAgent (alpha, epsilon, discount, action_space, state_space)
-agent = agent.SimpleSarsaAgent (alpha, epsilon, discount, action_space, state_space)
+# agent = agent.SimpleSarsaAgent (alpha, epsilon, discount, action_space, state_space)
 
 # Learning -----------
 
 # Get initial state from environment
+
+env.render(agent.qvalues)
+state = env.get_state()
+
+while(True):
+
+	possible_actions = env.get_possible_actions()
+	action = agent.get_action(state, possible_actions)
+	next_state, reward, done = env.step(action)
+	env.render(agent.qvalues)
+
+	next_state_possible_actions = env.get_possible_actions()
+	agent.update(state, action, reward, next_state, next_state_possible_actions, done)
+	state = next_state
+
+	if done == True:	
+		env.reset_state()
+		env.render(agent.qvalues)
+		state = env.get_state()
+		continue
+
 
 # Vanilla SARSA  
 
