@@ -4,13 +4,12 @@ import numpy as np
 import random
 
 # Environment ---------
-gridH, gridW = 4, 8
-start_pos = (3, 0)
-end_positions = [(3, 1), (3, 2), (3, 3), (3, 4), (3, 5), (3, 6), (3, 7)]
-end_rewards = [-100.0, -100.0, -100.0, -100.0, -100.0, -100.0, 100.0]
-blocked_positions = []
-default_reward= -1.0
-scale=100
+# gridH, gridW = 4, 8
+# start_pos = (3, 0)
+# end_positions = [(3, 1), (3, 2), (3, 3), (3, 4), (3, 5), (3, 6), (3, 7)]
+# end_rewards = [-100.0, -100.0, -100.0, -100.0, -100.0, -100.0, 100.0]
+# blocked_positions = []
+# default_reward= -1.0
 
 # gridH, gridW = 9, 7
 # start_pos = None
@@ -19,8 +18,16 @@ scale=100
 # blocked_positions = [(2, i) for i in range(3)] + [(6, i) for i in range(4, 7)]
 # default_reward = -0.1
 
+gridW, gridH = 4, 3
+start_pos = (0, 0)
+end_positions = [(3, 1), (3, 2)]
+end_rewards = [-10.0, 10.0]
+blocked_positions = [(1,1)]
+default_reward= -1.0
 
-env = environment.Environment(gridH, gridW, end_positions, end_rewards, blocked_positions, start_pos, default_reward, scale)
+
+scale=100
+env = environment.Environment(gridW, gridH, end_positions, end_rewards, blocked_positions, start_pos, default_reward, scale)
 
 # Agent -------------
 alpha = 0.2
@@ -29,58 +36,24 @@ discount = 0.99
 action_space = env.action_space
 state_space = env.state_space
 
-agent = agent.QLearningAgent(alpha, epsilon, discount, action_space, state_space)
-# agent = agent.EVSarsaAgent (alpha, epsilon, discount, action_space, state_space)
-# agent = agent.SimpleSarsaAgent (alpha, epsilon, discount, action_space, state_space)
+agent = agent.QLearningAgent(alpha, epsilon, discount, env)
 
 # Learning -----------
-
-# Get initial state from environment
-
-env.render(agent.qvalues)
+env.render(agent)
 state = env.get_state()
 
 while(True):
 
-	possible_actions = env.get_possible_actions()
-	action = agent.get_action(state, possible_actions)
+	action = agent.get_explore_action(state)
 	next_state, reward, done = env.step(action)
-	env.render(agent.qvalues)
+	env.render(agent)
 
-	next_state_possible_actions = env.get_possible_actions()
-	agent.update(state, action, reward, next_state, next_state_possible_actions, done)
+	agent.update(state, action, reward, next_state, done)
 	state = next_state
 
 	if done == True:	
 		env.reset_state()
-		env.render(agent.qvalues)
+		env.render(agent)
 		state = env.get_state()
 		continue
-
-
-# Vanilla SARSA  
-
-while(True):
-
-	#input ("Episode ")
-	env.reset_state()
-	state = env.get_state()
-	action = agent.get_action(state, range(action_space))
-
-	while (True):
-		#input ("Step ")
-		next_state, reward, done = env.step(action)
-		next_action = agent.get_action(next_state, range(action_space))
-	
-		#print (state, action, reward, next_state, next_action, done)
-		#print ("Qt", agent.qvalues[state, action], "Qt+1", agent.qvalues[next_state, next_action], "Error", reward + discount * agent.qvalues[next_state, next_action] - agent.qvalues[state, action])
-		agent.qvalues[state, action] = agent.qvalues[state, action] + alpha * ( reward + discount * agent.qvalues[next_state, next_action] - agent.qvalues[state, action])
-
-		env.render(agent.qvalues, agent.get_policy_action)
-
-		state = next_state
-		action = next_action
-		
-		if done == True:	
-			break
 
