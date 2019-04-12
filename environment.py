@@ -81,6 +81,36 @@ class Environment(object):
 
 	def get_state(self):
 		return self.state2idx[self.position]
+
+
+	def sa_eval(self,state,action):
+		position = self.idx2state(state)
+		if action >= self.action_space:
+			return
+
+		if action == 0: # North
+			proposed = (position[0], position[1]+1)
+			
+		elif action == 1: # East
+			proposed = (position[0] +1, position[1])
+			
+		elif action == 2: # South 
+			proposed = (position[0], position[1] -1)
+			
+		elif action == 3: # West
+			proposed = (position[0] -1, position[1])
+
+		x_within = proposed[0] >= 0 and proposed[0] < self.gridW
+		y_within = proposed[1] >= 0 and proposed[1] < self.gridH
+		free = proposed not in self.blocked_positions		
+		not_term = self.position not in self.end_positions	
+		next_state = position
+		if x_within and y_within and free and not_term:
+			next_state = proposed
+		next_state = self.state2idx[next_state] 
+		reward = self.idx2reward[next_state]
+
+		return next_state, reward
 		
 	def step(self, action):
 		
